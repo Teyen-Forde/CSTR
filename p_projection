@@ -1,0 +1,25 @@
+function PR=p_project (img,theta)
+%parallel projection, the basic of Radon Transform
+%pad the image with zeros so we don't lose anything when we rotate
+% [iLength, iWidth]=size(img);
+% iDiag=sqrt(iLength^2+iWidth^2);
+% LengthPad=ceil(iDiag-ilength)+1;
+% WidthPad=ceil(iDiag-iWidth)+1;
+% PadImg=zeros(iLength+LengthPad, iWidth+WidthPad);
+% PadImg(ceil(LengthPad/2):ceil(LengthPad/2+iLength-1),...
+%     ceil(WidthPad/2):ceil(WidthPad/2+iWidth-1))=Img;
+M0=length(theta);
+sz=size(img);
+N=sz(2);%%each projections the rays number equals maximum size of an object
+PR=zeros(M0,N);
+
+for i=1:M0
+%   tic
+    tmp_img=imrotate(img,-theta(i),'bilinear','crop');
+    %%%%why minus theta
+    PR(i,:)=sum(tmp_img);%sum of first dimension, get the sum of all column to form a new row
+%     theta(i)
+%     toc
+end
+% PR=PR';
+end
