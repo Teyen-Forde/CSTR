@@ -1,0 +1,23 @@
+%Local LMMSE Estimator
+%doc wiener2
+close all;
+clear all;
+I=double(imread('lena.tif'));
+sz=size(I);
+n=zeros(sz);
+for i=1:10,
+n=n+rand(sz)*30;
+end
+nI=I+n/i;
+[dI5, noise5]=wiener2(nI,[256,256]);
+[dI7, noise7]=wiener2(nI,[7,7]);
+
+PSNR0=cPSNR(I,nI);
+PSNR1=cPSNR(I,dI5);
+PSNR2=cPSNR(I,dI7);
+
+%%%plotting
+figure,
+subplot(131), imshow(nI,[0,255]),title(sprintf('noisy image, PSNR=%.4fdB',PSNR0));
+subplot(132), imshow(dI5,[0,255]),title(sprintf('window size 256, PSNR=%.4fdB',PSNR1));
+subplot(133), imshow(dI7,[0,255]),title(sprintf('window size 7, PSNR=%.4fdB',PSNR2));
