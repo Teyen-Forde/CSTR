@@ -1,0 +1,166 @@
+%CSTR compressed sensing based tomograhpy reconstruction
+% TWO FUNDAMENTAL MODEL: CS, FBP
+%%%built on 12/06/14
+clear all;
+close all;
+% addpath('C:\Users\Teyen\Documents\Research\Codes\PCA denoising');
+flag=1;%%whether plot or not 
+addnoise=1;
+load Hs;%in the order of projections, pz(:)
+H=Hs;
+%set image size
+I=double( imread('house.tif') );%[0,255]
+I=I/255;
+N=128;
+z=imresize(I,[N,N]);
+%set number of projection angles
+K0=7;
+M0=2^K0;%projection numbers
+
+% z=phantom('Modified Shepp-Logan',N);%%Phantom later we will use house.
+%%% 0<z<1
+if flag==1
+    figure;
+    imagesc(z), colormap gray;
+    title('Phantom Image');   
+end
+
+%parallel projection, changing view angle
+theta=(180/M0)*(0:(M0-1));
+pz=p_project(z,theta);
+pz=pz./M0;%convert to realistic projection data
+
+if flag==1
+    figure;
+    imagesc(pz), colormap gray;
+    title('Projection of Phantom Image');    
+end
+
+%%%%%%%%%%%% Add Poisson Noise
+if addnoise==1
+lambda=[1e3,1e4,1e5,1e6];
+I=length(lambda);
+pzN=cell(1,I);
+for i=1:I%random Poisson noise, lambda>1e7 becomes almost noise free
+M=lambda(i).*exp(-pz);
+sz=size(M);
+n=sqrt(M).*randn(sz);%approximate poissrnd
+pzN{i}=-log((M+n)./lambda(i));
+end
+% if flag==1
+%     figure;
+%     imagesc(pz), colormap gray;
+%     title('Sinogram with Poisson noise');    
+% end
+end
+
+sampM=7:-1:2;%sampling interval
+projNum=[19,22,26,32,43,64];
+J=length(sampM);
+
+PP=cell(I,J);
+HH=cell(I,J);
+tao=zeros(I,J);
+K=I*J;
+
+for i=1:I
+for j=1:J
+cof=zeros(size(pz));
+proj_vec=1:sampM(j):M0;
+pz=pzN{i}(:,proj_vec);
+cof(:,proj_vec)=1;
+ind=find(cof==1);
+tao(i,j)=1./(log(lambda(i))*length(proj_vec));
+HH{i,j}=H(ind,:);
+PP{i,j}=pz(:);%column by column sampling and returning a column vector
+end
+end
+
+%%%%%%%%%%%%%%ISTA_dct
+ista=0;
+%%%Call ista
+if ista==1
+Nit=200;
+Fdly_ISTA=zeros(I,J);
+Fdly_TVD=zeros(I,J);
+c1=0.1;
+tao1=c1*tao;
+
+tvd=1;
+c2=20;    
+tao2=c2*tao;
+
+for k=K:K%1e-3
+f_dct=ISTA_dct( PP{k}, HH{k}, tao1(k), Nit );
+Imag=reshape(f_dct,N,N);
+figure, imagesc(Imag), colormap gray;
+% saveas(gcf,fullfile(cd,['figure' num2str(figlist(i)) '.fig']))
+imwrite(Imag,fullfile('figures\ISTA\House',[num2str(k),'.tif']));
+Fdly_ISTA(k)=cFdly(z,Imag);
+if tvd==1
+[ I_tv,J1 ] = TVD( Imag,tao2(k),Nit );
+Fdly_TVD(k)=cFdly(z,I_tv);
+ figure, imagesc(I_tv), colormap gray;
+imwrite(Imag,fullfile('figures\TVD\House',[num2str(k),'.tif']));
+end
+end
+save data\Fdly_ISTA Fdly_ISTA;
+if tvd==1
+save data\Fdly_TVD Fdly_TVD;
+end
+end
+%%%%%%%%%%%%%%%%%%%%%end
+
+%%%%%%%%%%%%%%%%%%ITV
+itv=1;
+if itv==1,
+Nit=100;
+c3=0.5;
+tao3=c3*tao;
+% N=128;
+Fdly_ITV=zeros(I,J);
+for k=1:K
+[f_tv]=ITV_fast( PP{k}, HH{k}, tao3(k), Nit );
+% f_tv=(f_tv-min(f_tv))/(max(f_tv)-min(f_tv));%normalize
+Imag=reshape(f_tv,N,N);
+Fdly_ITV(k)=cFdly(z,Imag);
+figure, imagesc(Imag), colormap gray;
+imwrite(Imag,fullfile('figures\ITV\House',[num2str(k),'.tif']));
+end
+save data\Fdly_ITV Fdly_ITV;
+end
+%%%%%%%%%%%%end
+
+%%%%%%%%%%%%%%%%%%FBP
+fbp=0;
+if fbp==1,
+Nit=400;
+c4=128;
+tao4=c4*tao;
+
+% N=128;
+Fdly_FBP=zeros(I,J);
+for i=1:I
+    for j=1:J
+        
+    p_vec=1:sampM(j):M0;
+%     pz0=pzN{i}(:,p_vec);
+    pz_f=proj_filter(pzN{i});
+    pz0=pz_f(:,p_vec);
+    zz=b_project(pz0*M0,theta(p_vec));
+    [ Imag,Junk ] = TVD( zz,tao4(i,j),Nit );
+    Fdly_FBP(i,j)=cFdly(z,Imag);
+ figure, imagesc(Imag), colormap gray;
+% imwrite(Imag,fullfile('figures\FBP',[num2str(I*(j-1)+i),'.tif']));
+    end
+end
+save data\Fdly_FBP Fdly_FBP;
+end
+%%%%%%%%%%%%%%%%%%%end
+
+%%%%%%%%%%%%%%LMMSE
+
+%%%%%%%%%%%%%%%%%end
+%%%%%%%%%%%%%%%%%BP
+%%%%%%%%%%%%%%%%%end
+
